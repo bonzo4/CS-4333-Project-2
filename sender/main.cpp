@@ -14,7 +14,7 @@ int main (int argc, char* argv[]) {
     sender.setFilename("manuscript.txt");
     sender.setLocalPort(8080);
     sender.setRecvPort(8081);
-    sender.setTimeoutMs(10000);
+    sender.setTimeoutMs(1000);
 
     sender.sendFile();
 

@@ -1,7 +1,31 @@
 #ifndef SENDER_HPP
 #define SENDER_HPP
 
-#include <string>
+#include "utils.hpp"
+
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <fstream>
+#include <iostream>
+#include <cstring>
+#include <sys/select.h>
+
+struct SendPacketOptions {
+    std::ifstream& file;
+    int socketfd;
+    struct sockaddr_in recvAddr;
+    uint32_t packetIndex;
+    bool fileComplete;
+};
+
+struct WaitForAckOptions {
+    int socketfd;
+    struct sockaddr_in recvAddr;
+    uint32_t& packetIndex;
+    bool& fileComplete;
+    bool ackReceived = false;
+};
 
 class Sender {
     public:
@@ -30,6 +54,9 @@ class Sender {
         int mode_;
         long modeParameter_;
         long timeoutMs_;
+
+        int sendPacket_(SendPacketOptions& options);
+        void waitForAck_(WaitForAckOptions& options);
 };
 
 #endif // SENDER_HPP
