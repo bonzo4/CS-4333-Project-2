@@ -1,8 +1,6 @@
 #ifndef RECEIVER_HPP
 #define RECEIVER_HPP
 
-#include "utils.hpp"
-
 #include <string>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -12,6 +10,8 @@
 #include <cstring>
 #include <map>
 #include <vector>
+
+#define MAX_DATA_SIZE 64
 
 enum PacketType {
     DATA = 0,
