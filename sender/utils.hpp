@@ -29,10 +29,10 @@ const std::unordered_map<std::string, std::string> shortArgMap = {
     {"-a", "--arq"},
     {"-d", "--drop-rate"},
     {"-m", "--mtu"},
-    {"-mp", "--modeParameter"}
+    {"-mp", "--mode-parameter"}
 };
 
-inline void parseArgs(int argc, char* argv[], Config& config) {
+void parseArgs(int argc, char* argv[], Config& config) {
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (shortArgMap.count(arg)) { 
