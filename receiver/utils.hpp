@@ -6,24 +6,11 @@
 #include <stdexcept>
 #include <cstdint>
 
-#define MAX_DATA_SIZE 512
+#define MAX_DATA_SIZE 64
 
 enum class ARQMode {
     STOP_AND_WAIT,
     SLIDING_WINDOW,
-};
-
-enum PacketType : uint8_t {
-    DATA = 0,
-    ACK = 1
-};
-
-struct Packet {
-    uint32_t packetIndex;
-    uint16_t dataSize;
-    PacketType type;
-    uint8_t isLast;
-    char data[MAX_DATA_SIZE];
 };
 
 struct Config {

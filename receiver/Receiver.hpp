@@ -10,23 +10,25 @@
 #include <fstream>
 #include <iostream>
 #include <cstring>
+#include <map>
+#include <vector>
 
-struct ReceivePacketOptions {
-    Packet& packet;
-    int sockfd;
-    struct sockaddr_in& senderAddr;
-    socklen_t& senderAddrLen;
-    uint32_t& packetIndex;
-    std::ofstream& outFile;
-    int& filesize;
-    time_t& startTime;
+enum PacketType {
+    DATA = 0,
+    ACK = 1
 };
 
-struct SendAckOptions {
-    int sockfd;
-    struct sockaddr_in senderAddr;
-    socklen_t senderAddrLen;
-    uint32_t packetIndex;
+struct Packet {
+    int packetIndex;
+    int dataSize;
+    PacketType type;
+    bool isLast;
+    char data[MAX_DATA_SIZE];
+};
+
+struct BufferedPacket {
+    Packet packet;
+    bool received;
 };
 
 class Receiver {
@@ -35,13 +37,9 @@ class Receiver {
 
         std::string getFilename() const { return filename_; }
         int getLocalPort() const { return localPort_; }
-        int getMode() const { return mode_; }
-        long getModeParameter() const { return modeParameter_; }
 
         void setFilename(const std::string& filename) { filename_ = filename; }
         void setLocalPort(int port) { localPort_ = port; }
-        void setMode(int mode) { mode_ = mode; }
-        void setModeParameter(long param) { modeParameter_ = param; }
 
         void receiveFile();
 
@@ -49,11 +47,6 @@ class Receiver {
         std::string filename_;
         int localPort_;
         int senderPort_;
-        int mode_;
-        long modeParameter_;
-
-        int receivePacket_(ReceivePacketOptions& options);
-        void sendAck_(SendAckOptions& options);
 };
 
 #endif // RECEIVER_HPP

@@ -10,21 +10,28 @@
 #include <iostream>
 #include <cstring>
 #include <sys/select.h>
+#include <map>
+#include <vector>
+#include <chrono>
+#include <random>
 
-struct SendPacketOptions {
-    std::ifstream& file;
-    int socketfd;
-    struct sockaddr_in recvAddr;
-    uint32_t packetIndex;
-    bool fileComplete;
+enum PacketType {
+    DATA = 0,
+    ACK = 1,
 };
 
-struct WaitForAckOptions {
-    int socketfd;
-    struct sockaddr_in recvAddr;
-    uint32_t& packetIndex;
-    bool& fileComplete;
-    bool ackReceived = false;
+struct Packet {
+    int packetIndex;
+    int dataSize;
+    PacketType type;
+    bool isLast;
+    char data[MAX_DATA_SIZE];
+};
+
+struct PacketInfo {
+    Packet packet;
+    std::chrono::steady_clock::time_point sentTime;
+    bool hasBeenSent;
 };
 
 class Sender {
@@ -36,14 +43,18 @@ class Sender {
         int getRecvPort() const { return recvPort_; }
         int getMode() const { return mode_; }
         long getModeParameter() const { return modeParameter_; }
+        long getMTU() const { return mtu_; }
         long getTimeoutMs() const { return timeoutMs_; }
+        float getDropRate() const { return dropRate_; }
 
         void setFilename(const std::string& filename) { filename_ = filename; }
         void setLocalPort(int port) { localPort_ = port; }
         void setRecvPort(int port) { recvPort_ = port; }
         void setMode(int mode) { mode_ = mode; }
         void setModeParameter(long param) { modeParameter_ = param; }
+        void setMTU(long mtu) { mtu_ = mtu; }
         void setTimeoutMs(long timeout) { timeoutMs_ = timeout; }
+        void setDropRate(float dropRate) { dropRate_ = dropRate; }
 
         void sendFile();
 
@@ -53,10 +64,9 @@ class Sender {
         int recvPort_;
         int mode_;
         long modeParameter_;
+        long mtu_;
         long timeoutMs_;
-
-        int sendPacket_(SendPacketOptions& options);
-        void waitForAck_(WaitForAckOptions& options);
+        float dropRate_;
 };
 
 #endif // SENDER_HPP

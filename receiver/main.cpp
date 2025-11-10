@@ -8,8 +8,6 @@ int main (int argc, char* argv[]) {
 
     Receiver receiver;
 
-    receiver.setMode(static_cast<int>(config.arqType));
-    receiver.setModeParameter(0);
     receiver.setFilename("received_manuscript.txt");
     receiver.setLocalPort(8081);
 

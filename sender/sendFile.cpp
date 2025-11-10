@@ -1,6 +1,7 @@
 #include "Sender.hpp"
 #include "utils.hpp"
 
+
 void Sender::sendFile() {
 
     std::ifstream file(getFilename(), std::ios::binary);
@@ -23,10 +24,7 @@ void Sender::sendFile() {
         return;
     }
 
-    uint32_t packetIndex = 1;
-    bool fileComplete = false;
-
-    int filesize = file.seekg(0, std::ios::end).tellg();
+    long filesize = file.seekg(0, std::ios::end).tellg();
     file.seekg(0, std::ios::beg);
 
     std::cout << "[INFO] Sending " << getFilename() 
@@ -37,15 +35,113 @@ void Sender::sendFile() {
 
     time_t startTime = time(nullptr);
 
-    SendPacketOptions options {
-        .file = file,
-        .socketfd = socketfd,
-        .recvAddr = recvAddr,
-        .packetIndex = packetIndex,
-        .fileComplete = fileComplete
-    };
+    int packetIndex = 1;
+    long windowSize = static_cast<long>(getModeParameter() / getMTU());
+    std::map<int, PacketInfo> packetsToSend;
+    bool allDataRead = false;
 
-    while (!options.fileComplete && sendPacket_(options)) { }
+    while (true) {
+        // create packets
+        while (!allDataRead && packetsToSend.size() < windowSize) {
+            Packet dataPacket;
+            memset(&dataPacket, 0, sizeof(dataPacket));
+
+            file.read(dataPacket.data, getMTU());
+            dataPacket.dataSize = file.gcount();
+            dataPacket.packetIndex = packetIndex;
+            dataPacket.type = DATA;
+            dataPacket.isLast = 0;
+
+            if (file.eof()) {
+                allDataRead = true;
+                dataPacket.isLast = 1;
+            }
+    
+            PacketInfo packetInfo;
+            packetInfo.packet = dataPacket;
+            packetInfo.sentTime = std::chrono::steady_clock::now() - std::chrono::seconds(1);
+            packetInfo.hasBeenSent = false;
+            packetsToSend[packetIndex] = packetInfo;
+
+            packetIndex++;
+        }
+
+        auto currentTime = std::chrono::steady_clock::now();
+        
+        // send packets
+        for (auto& pair : packetsToSend) {
+            int packetKey = pair.first;
+            PacketInfo& packetInfo = pair.second;
+            
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                currentTime - packetInfo.sentTime).count();
+            
+            if (elapsed > getTimeoutMs()) {
+                if (packetInfo.hasBeenSent) {
+                    std::cout << "[INFO] Timeout: No ACK received for message " << packetKey 
+                              << ", retransmitting..." << std::endl;
+                }
+                
+                static std::random_device rd;
+                static std::mt19937 gen(rd());
+                static std::uniform_real_distribution<> dis(0.0, 1.0);
+                float randomValue = dis(gen);
+
+                packetInfo.hasBeenSent = true;
+                packetInfo.sentTime = currentTime;
+                
+                if (randomValue < getDropRate()) {
+                    std::cout << "[INFO] Simulating packet loss for message " << packetKey << std::endl;
+                } else {
+                    ssize_t bytesSent = sendto(
+                        socketfd, 
+                        &packetInfo.packet,
+                        sizeof(packetInfo.packet), 
+                        0,
+                        (struct sockaddr*)&recvAddr, 
+                        sizeof(recvAddr));
+                    std::cout << "[INFO] Message " << packetKey 
+                              << " sent with " << packetInfo.packet.dataSize 
+                              << " bytes of actual data" << std::endl;
+                }
+                
+            }
+        }
+
+        // receive ACKs
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(socketfd, &readfds);
+
+        struct timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 10000;
+
+        int selectResult = select(socketfd + 1, &readfds, NULL, NULL, &timeout);
+                
+        if (selectResult > 0) {
+            struct sockaddr_in ackAddr;
+            socklen_t ackAddrLen = sizeof(ackAddr);
+            Packet ackPacket;
+            
+            ssize_t bytesReceived = recvfrom(socketfd, &ackPacket, sizeof(ackPacket), MSG_DONTWAIT,
+                                            (struct sockaddr*)&ackAddr, &ackAddrLen);
+
+            if (ackPacket.type == ACK) {
+                int ackIndex = ackPacket.packetIndex;
+
+                if (packetsToSend.find(ackIndex) != packetsToSend.end()) {
+                    std::cout << "[INFO] Message " << ackIndex << " acknowledged" << std::endl;
+
+                    packetsToSend.erase(ackIndex);
+                } 
+            }
+        }
+
+        if (allDataRead && packetsToSend.empty()) {
+            break;
+        }
+    }
     
     close(socketfd);
     file.close();

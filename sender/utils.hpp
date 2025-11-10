@@ -1,37 +1,23 @@
 #ifndef SENDER_UTILS_HPP
 #define SENDER_UTILS_HPP
 
+#define MAX_DATA_SIZE 64
+
 #include <unordered_map>
 #include <string>
 #include <stdexcept>
 #include <cstdint>
-
-#define MAX_DATA_SIZE 512
 
 enum class ARQMode {
     STOP_AND_WAIT,
     SLIDING_WINDOW,
 };
 
-enum PacketType : uint8_t {
-    DATA = 0,
-    ACK = 1,
-};
-
-struct Packet {
-    uint32_t packetIndex;
-    uint16_t dataSize;
-    PacketType type;
-    uint8_t isLast;
-    char data[MAX_DATA_SIZE];
-};
-
 struct Config {
     ARQMode arqType = ARQMode::STOP_AND_WAIT;
     float dropRate = 0.0f;
-    int delayMinMs = 10;
-    int delayMaxMs = 100;
-    int mtu = 0;
+    long modeParameter = 256;
+    long mtu = MAX_DATA_SIZE;
 };
 
 const std::unordered_map<std::string, ARQMode> arqModeMap = {
@@ -42,9 +28,8 @@ const std::unordered_map<std::string, ARQMode> arqModeMap = {
 const std::unordered_map<std::string, std::string> shortArgMap = {
     {"-a", "--arq"},
     {"-d", "--drop-rate"},
-    {"-dmin", "--delay-min"},
-    {"-dmax", "--delay-max"},
-    {"-m", "--mtu"}
+    {"-m", "--mtu"},
+    {"-mp", "--modeParameter"}
 };
 
 inline void parseArgs(int argc, char* argv[], Config& config) {
@@ -63,12 +48,10 @@ inline void parseArgs(int argc, char* argv[], Config& config) {
             }
         } else if (arg == "--drop-rate" && i + 1 < argc) {
             config.dropRate = std::stof(argv[++i]);
-        } else if (arg == "--delay-min" && i + 1 < argc) {
-            config.delayMinMs = std::stoi(argv[++i]);
-        } else if (arg == "--delay-max" && i + 1 < argc) {
-            config.delayMaxMs = std::stoi(argv[++i]);
+        } else if (arg == "--modeParameter" && i + 1 < argc) {
+            config.modeParameter = std::stoi(argv[++i]);
         } else if (arg == "--mtu" && i + 1 < argc) {
-            config.mtu = std::stoi(argv[++i]);
+            config.mtu = std::stol(argv[++i]);
         } else {
             throw std::invalid_argument("Unknown argument: " + arg);
         }
