@@ -2,9 +2,9 @@
 
 void Receiver::receiveFile() {
 
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    
-    if (sockfd < 0) {
+    int socketFd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if (socketFd < 0) {
         std::cerr << "[ERROR] Could not create socket" << std::endl;
         return;
     }
@@ -13,10 +13,10 @@ void Receiver::receiveFile() {
     recvAddr.sin_family = AF_INET;
     recvAddr.sin_port = htons(getLocalPort());
     recvAddr.sin_addr.s_addr = INADDR_ANY;
-    
-    if (bind(sockfd, (struct sockaddr*)&recvAddr, sizeof(recvAddr)) < 0) {
+
+    if (bind(socketFd, (struct sockaddr*)&recvAddr, sizeof(recvAddr)) < 0) {
         std::cerr << "[ERROR] Could not bind socket to port " << getLocalPort() << std::endl;
-        close(sockfd);
+        close(socketFd);
         return;
     }
     
@@ -28,7 +28,7 @@ void Receiver::receiveFile() {
 
     if (!outFile.is_open()) {
         std::cerr << "[ERROR] Could not open output file " << getFilename() << std::endl;
-        close(sockfd);
+        close(socketFd);
         return;
     }
     
@@ -45,13 +45,23 @@ void Receiver::receiveFile() {
     std::map<int, Packet> receiveBuffer;
     int totalPackets = 0;
 
-    while (true) {
+    while (totalPackets == 0 || receiveBuffer.size() < totalPackets) {
         // receive packets
-        ssize_t bytesReceived = recvfrom(sockfd, &packet, sizeof(packet), 0,
-                                        (struct sockaddr*)&senderAddr, &senderAddrLen);
+        ssize_t bytesReceived = recvfrom(
+            socketFd,                        // socket file descriptor
+            &packet,                         // buffer to store received packet
+            sizeof(packet),                  // size of the buffer
+            0,                               // flags
+            (struct sockaddr*)&senderAddr,   // address of the sender
+            &senderAddrLen                   // length of the sender address
+        );                 
 
-        if (bytesReceived <= 0 || packet.type != DATA) {
+        if (bytesReceived <= 0) {
             continue;
+        }
+
+        if (packet.isLast) {
+            totalPackets = packet.packetIndex;
         }
 
         std::cout << "[INFO] Message " << packet.packetIndex << " received with " 
@@ -61,18 +71,21 @@ void Receiver::receiveFile() {
 
         // send ACK
         Packet ackPacket;
-        ackPacket.type = ACK;
         ackPacket.packetIndex = packet.packetIndex;
-        sendto(sockfd, &ackPacket, sizeof(ackPacket), 0,
-               (struct sockaddr*)&senderAddr, senderAddrLen);
-        std::cout << "[INFO] Sending acknowledgment for message " << packet.packetIndex << std::endl;
+        size_t bytesSent = sendto(
+            socketFd,                       // socket file descriptor 
+            &ackPacket,                     // buffer to send
+            sizeof(ackPacket),              // size of the ACK packet
+            0,                              // flags
+            (struct sockaddr*)&senderAddr,  // address of the sender
+            senderAddrLen                   // length of the sender address
+        );
 
-        if (packet.isLast) {
-            totalPackets = packet.packetIndex;
-        }
-
-        if (totalPackets > 0 && receiveBuffer.size() == totalPackets) {
-            break;
+        if (bytesSent <= 0) {
+            std::cerr << "[ERROR] Could not send acknowledgment for message " 
+                      << packet.packetIndex << std::endl;
+        } else {
+            std::cout << "[INFO] Sending acknowledgment for message " << packet.packetIndex << std::endl;
         }
     }
 
@@ -88,7 +101,7 @@ void Receiver::receiveFile() {
     }
 
     outFile.close();
-    close(sockfd);
+    close(socketFd);
     
     time_t endTime = time(nullptr);
     

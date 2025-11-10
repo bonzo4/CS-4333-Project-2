@@ -40,8 +40,8 @@ void Sender::sendFile() {
     std::map<int, PacketInfo> packetsToSend;
     bool allDataRead = false;
 
-    while (true) {
-        // create packets
+    while (!allDataRead || !packetsToSend.empty()) {
+        // create packets and add packets to window
         while (!allDataRead && packetsToSend.size() < windowSize) {
             Packet dataPacket;
             memset(&dataPacket, 0, sizeof(dataPacket));
@@ -49,12 +49,11 @@ void Sender::sendFile() {
             file.read(dataPacket.data, getMTU());
             dataPacket.dataSize = file.gcount();
             dataPacket.packetIndex = packetIndex;
-            dataPacket.type = DATA;
-            dataPacket.isLast = 0;
+            dataPacket.isLast = false;
 
             if (file.eof()) {
                 allDataRead = true;
-                dataPacket.isLast = 1;
+                dataPacket.isLast = true;
             }
     
             PacketInfo packetInfo;
@@ -93,17 +92,17 @@ void Sender::sendFile() {
                     std::cout << "[INFO] Simulating packet loss for message " << packetKey << std::endl;
                 } else {
                     ssize_t bytesSent = sendto(
-                        socketfd, 
-                        &packetInfo.packet,
-                        sizeof(packetInfo.packet), 
-                        0,
-                        (struct sockaddr*)&recvAddr, 
-                        sizeof(recvAddr));
+                        socketfd,                       // socket file descriptor
+                        &packetInfo.packet,             // buffer to send
+                        sizeof(packetInfo.packet),      // size of the packet
+                        0,                              // flags
+                        (struct sockaddr*)&recvAddr,    // address of the receiver
+                        sizeof(recvAddr)                // length of the receiver address
+                    );
                     std::cout << "[INFO] Message " << packetKey 
                               << " sent with " << packetInfo.packet.dataSize 
                               << " bytes of actual data" << std::endl;
                 }
-                
             }
         }
 
@@ -121,24 +120,24 @@ void Sender::sendFile() {
         if (selectResult > 0) {
             struct sockaddr_in ackAddr;
             socklen_t ackAddrLen = sizeof(ackAddr);
-            Packet ackPacket;
+            AckPacket ackPacket;
             
-            ssize_t bytesReceived = recvfrom(socketfd, &ackPacket, sizeof(ackPacket), MSG_DONTWAIT,
-                                            (struct sockaddr*)&ackAddr, &ackAddrLen);
+            ssize_t bytesReceived = recvfrom(
+                socketfd,                    // socket file descriptor
+                &ackPacket,                  // buffer to store the ACK packet
+                sizeof(ackPacket),           // size of the ACK packet
+                MSG_DONTWAIT,                // flags
+                (struct sockaddr*)&ackAddr,  // address of the sender
+                &ackAddrLen                  // length of the sender address
+            );
 
-            if (ackPacket.type == ACK) {
-                int ackIndex = ackPacket.packetIndex;
+            int ackIndex = ackPacket.packetIndex;
 
-                if (packetsToSend.find(ackIndex) != packetsToSend.end()) {
-                    std::cout << "[INFO] Message " << ackIndex << " acknowledged" << std::endl;
+            if (packetsToSend.find(ackIndex) != packetsToSend.end()) {
+                std::cout << "[INFO] Message " << ackIndex << " acknowledged" << std::endl;
 
-                    packetsToSend.erase(ackIndex);
-                } 
-            }
-        }
-
-        if (allDataRead && packetsToSend.empty()) {
-            break;
+                packetsToSend.erase(ackIndex);
+            } 
         }
     }
     

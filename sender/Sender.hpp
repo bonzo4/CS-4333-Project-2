@@ -15,18 +15,17 @@
 #include <chrono>
 #include <random>
 
-enum PacketType {
-    DATA = 0,
-    ACK = 1,
+struct AckPacket {
+    int packetIndex;
 };
 
 struct Packet {
     int packetIndex;
     int dataSize;
-    PacketType type;
     bool isLast;
     char data[MAX_DATA_SIZE];
 };
+
 
 struct PacketInfo {
     Packet packet;
