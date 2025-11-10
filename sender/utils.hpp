@@ -32,7 +32,7 @@ const std::unordered_map<std::string, std::string> shortArgMap = {
     {"-mp", "--mode-parameter"}
 };
 
-void parseArgs(int argc, char* argv[], Config& config) {
+inline void parseArgs(int argc, char* argv[], Config& config) {
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (shortArgMap.count(arg)) { 
@@ -48,7 +48,7 @@ void parseArgs(int argc, char* argv[], Config& config) {
             }
         } else if (arg == "--drop-rate" && i + 1 < argc) {
             config.dropRate = std::stof(argv[++i]);
-        } else if (arg == "--modeParameter" && i + 1 < argc) {
+        } else if (arg == "--mode-parameter" && i + 1 < argc) {
             config.modeParameter = std::stoi(argv[++i]);
         } else if (arg == "--mtu" && i + 1 < argc) {
             config.mtu = std::stol(argv[++i]);

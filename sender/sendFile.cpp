@@ -33,7 +33,7 @@ void Sender::sendFile() {
               << " with " << filesize << " bytes"
               << std::endl;
 
-    time_t startTime = time(nullptr);
+    auto startTime = std::chrono::steady_clock::now();
 
     int packetIndex = 1;
     long windowSize = static_cast<long>(getModeParameter() / getMTU());
@@ -59,7 +59,7 @@ void Sender::sendFile() {
     
             PacketInfo packetInfo;
             packetInfo.packet = dataPacket;
-            packetInfo.sentTime = std::chrono::steady_clock::now() - std::chrono::seconds(1);
+            packetInfo.sentTime = std::chrono::steady_clock::now() - getTimeoutMs() * std::chrono::milliseconds(1);
             packetInfo.hasBeenSent = false;
             packetsToSend[packetIndex] = packetInfo;
 
@@ -67,7 +67,7 @@ void Sender::sendFile() {
         }
 
         auto currentTime = std::chrono::steady_clock::now();
-        
+
         // send packets
         for (auto& pair : packetsToSend) {
             int packetKey = pair.first;
@@ -78,8 +78,7 @@ void Sender::sendFile() {
             
             if (elapsed > getTimeoutMs()) {
                 if (packetInfo.hasBeenSent) {
-                    std::cout << "[INFO] Timeout: No ACK received for message " << packetKey 
-                              << ", retransmitting..." << std::endl;
+                    std::cout << "[INFO] Message " << packetKey << " timed out" << std::endl;
                 }
                 
                 static std::random_device rd;
@@ -146,9 +145,10 @@ void Sender::sendFile() {
     close(socketfd);
     file.close();
 
-    time_t endTime = time(nullptr);
+    auto endTime = std::chrono::steady_clock::now();
+    auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
 
     std::cout << "[INFO] Successfully transferred " << getFilename() 
               << " (" << filesize << " bytes) in " 
-              << (endTime - startTime) << " seconds" << std::endl;
+              << elapsedMs << " ms" << std::endl;
 }
