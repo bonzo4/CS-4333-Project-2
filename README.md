@@ -13,5 +13,5 @@
    ```
 4. Run sender (in another terminal):    
    ```bash
-   ./sender_program
+   ./sender_program [-a <stop-and-wait | sliding-window>] [-d <drop-rate>] [-m <mtu>] [-mp <mode-parameter>]
    ```
