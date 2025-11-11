@@ -1,4 +1,5 @@
 #include "Receiver.hpp"
+#include <set>
 
 void Receiver::receiveFile() {
 
@@ -24,7 +25,7 @@ void Receiver::receiveFile() {
               << " listening on 127.0.0.1:" << getLocalPort() 
               << std::endl;
 
-    std::ofstream outFile(getFilename(), std::ios::binary);
+    std::ofstream outFile(getFilename(), std::ios::binary | std::ios::in | std::ios::out | std::ios::trunc);
 
     if (!outFile.is_open()) {
         std::cerr << "[ERROR] Could not open output file " << getFilename() << std::endl;
@@ -42,10 +43,10 @@ void Receiver::receiveFile() {
     time_t startTime;
     long filesize = 0;
 
-    std::map<int, Packet> receiveBuffer;
+    std::set<int> receivedPackets;
     int totalPackets = 0;
 
-    while (totalPackets == 0 || receiveBuffer.size() < totalPackets) {
+    while (totalPackets == 0 || receivedPackets.size() < totalPackets) {
         // receive packets
         ssize_t bytesReceived = recvfrom(
             socketFd,                        // socket file descriptor
@@ -61,13 +62,24 @@ void Receiver::receiveFile() {
         }
 
         if (packet.isLast) {
-            totalPackets = packet.packetIndex;
+            totalPackets = packet.packetIndex + 1;
         }
 
         std::cout << "[INFO] Message " << packet.packetIndex << " received with " 
                   << packet.dataSize << " bytes of actual data" << std::endl;
 
-        receiveBuffer[packet.packetIndex] = packet;
+        // write to file
+        if (receivedPackets.find(packet.packetIndex) != receivedPackets.end()) {
+            std::cout << "[INFO] Duplicate packet " << packet.packetIndex << " ignored" << std::endl;
+        } else {
+            std::streampos offset = static_cast<std::streampos>(packet.packetIndex) * MAX_DATA_SIZE;
+            outFile.seekp(offset);
+            outFile.write(packet.data, packet.dataSize);
+            outFile.flush();
+            
+            receivedPackets.insert(packet.packetIndex);
+            filesize += packet.dataSize;
+        }
 
         // send ACK
         Packet ackPacket;
@@ -86,17 +98,6 @@ void Receiver::receiveFile() {
                       << packet.packetIndex << std::endl;
         } else {
             std::cout << "[INFO] Sending acknowledgment for message " << packet.packetIndex << std::endl;
-        }
-    }
-
-    // write received data to file in order
-    for (int i = 1; i <= totalPackets; i++) {
-        if (receiveBuffer.find(i) != receiveBuffer.end()) {
-            Packet& pkt = receiveBuffer[i];
-            outFile.write(pkt.data, pkt.dataSize);
-            filesize += pkt.dataSize;
-        } else {
-            std::cerr << "[ERROR] Missing packet " << i << std::endl;
         }
     }
 

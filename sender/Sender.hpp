@@ -10,10 +10,11 @@
 #include <iostream>
 #include <cstring>
 #include <sys/select.h>
-#include <map>
+#include <unordered_map>
 #include <vector>
 #include <chrono>
 #include <random>
+#include <algorithm>
 
 struct AckPacket {
     int packetIndex;
@@ -29,7 +30,6 @@ struct Packet {
 
 struct PacketInfo {
     Packet packet;
-    std::chrono::steady_clock::time_point sentTime;
     bool hasBeenSent;
 };
 

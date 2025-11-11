@@ -1,6 +1,4 @@
 #include "Sender.hpp"
-#include "utils.hpp"
-
 
 void Sender::sendFile() {
 
@@ -35,9 +33,9 @@ void Sender::sendFile() {
 
     auto startTime = std::chrono::steady_clock::now();
 
-    int packetIndex = 1;
+    int packetIndex = 0;
     long windowSize = static_cast<long>(getModeParameter() / getMTU());
-    std::map<int, PacketInfo> packetsToSend;
+    std::unordered_map<int, PacketInfo> packetsToSend;
     bool allDataRead = false;
 
     while (!allDataRead || !packetsToSend.empty()) {
@@ -58,66 +56,70 @@ void Sender::sendFile() {
     
             PacketInfo packetInfo;
             packetInfo.packet = dataPacket;
-            packetInfo.sentTime = std::chrono::steady_clock::now() - getTimeoutMs() * std::chrono::milliseconds(1);
             packetInfo.hasBeenSent = false;
             packetsToSend[packetIndex] = packetInfo;
 
             packetIndex++;
         }
 
-        auto currentTime = std::chrono::steady_clock::now();
-
-        // send packets
-        for (auto& pair : packetsToSend) {
-            int packetKey = pair.first;
-            PacketInfo& packetInfo = pair.second;
+        // send packets in random order
+        std::vector<int> packetKeys;
+        for (const auto& pair : packetsToSend) {
+            packetKeys.push_back(pair.first);
+        }
+        
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        std::shuffle(packetKeys.begin(), packetKeys.end(), gen);
+        
+        static std::uniform_real_distribution<> dis(0.0, 1.0);
+        
+        for (int packetKey : packetKeys) {
+            PacketInfo& packetInfo = packetsToSend[packetKey];
             
-            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                currentTime - packetInfo.sentTime).count();
-            
-            if (elapsed > getTimeoutMs()) {
-                if (packetInfo.hasBeenSent) {
-                    std::cout << "[INFO] Message " << packetKey << " timed out" << std::endl;
-                }
-                
-                static std::random_device rd;
-                static std::mt19937 gen(rd());
-                static std::uniform_real_distribution<> dis(0.0, 1.0);
-                float randomValue = dis(gen);
+            if (packetInfo.hasBeenSent) {
+                continue;
+            }
+            float randomValue = dis(gen);
 
-                packetInfo.hasBeenSent = true;
-                packetInfo.sentTime = currentTime;
-                
-                if (randomValue < getDropRate()) {
-                    std::cout << "[INFO] Simulating packet loss for message " << packetKey << std::endl;
-                } else {
-                    ssize_t bytesSent = sendto(
-                        socketfd,                       // socket file descriptor
-                        &packetInfo.packet,             // buffer to send
-                        sizeof(packetInfo.packet),      // size of the packet
-                        0,                              // flags
-                        (struct sockaddr*)&recvAddr,    // address of the receiver
-                        sizeof(recvAddr)                // length of the receiver address
-                    );
-                    std::cout << "[INFO] Message " << packetKey 
-                              << " sent with " << packetInfo.packet.dataSize 
-                              << " bytes of actual data" << std::endl;
-                }
+            packetInfo.hasBeenSent = true;
+            
+            if (randomValue < getDropRate()) {
+                std::cout << "[INFO] Simulating packet loss for message " << packetKey << std::endl;
+            } else {
+                ssize_t bytesSent = sendto(
+                    socketfd,                       // socket file descriptor
+                    &packetInfo.packet,             // buffer to send
+                    sizeof(packetInfo.packet),      // size of the packet
+                    0,                              // flags
+                    (struct sockaddr*)&recvAddr,    // address of the receiver
+                    sizeof(recvAddr)                // length of the receiver address
+                );
+                std::cout << "[INFO] Message " << packetKey 
+                            << " sent with " << packetInfo.packet.dataSize 
+                            << " bytes of actual data" << std::endl;
             }
         }
 
-        // receive ACKs
+        // wait for ACKs with timeout
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(socketfd, &readfds);
 
         struct timeval timeout;
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 10000;
+        timeout.tv_sec = getTimeoutMs() / 1000;
+        timeout.tv_usec = (getTimeoutMs() % 1000) * 1000;
 
         int selectResult = select(socketfd + 1, &readfds, NULL, NULL, &timeout);
-                
-        if (selectResult > 0) {
+        
+        if (selectResult == 0) {
+            for (auto& pair : packetsToSend) {
+                if (pair.second.hasBeenSent) {
+                    std::cout << "[INFO] Message " << pair.first << " timed out" << std::endl;
+                    pair.second.hasBeenSent = false;
+                }
+            }
+        } else if (selectResult > 0) {
             struct sockaddr_in ackAddr;
             socklen_t ackAddrLen = sizeof(ackAddr);
             AckPacket ackPacket;
