@@ -52,6 +52,9 @@ inline void parseArgs(int argc, char* argv[], Config& config) {
             config.modeParameter = std::stoi(argv[++i]);
         } else if (arg == "--mtu" && i + 1 < argc) {
             config.mtu = std::stol(argv[++i]);
+            if (config.mtu <= 0 || config.mtu > MAX_DATA_SIZE) {
+                throw std::invalid_argument("MTU must be between 1 and " + std::to_string(MAX_DATA_SIZE));
+            }
         } else {
             throw std::invalid_argument("Unknown argument: " + arg);
         }
