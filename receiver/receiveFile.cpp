@@ -45,6 +45,7 @@ void Receiver::receiveFile() {
 
     std::set<int> receivedPackets;
     int totalPackets = 0;
+    int mtu = 0;
 
     while (totalPackets == 0 || receivedPackets.size() < totalPackets) {
         // receive packets
@@ -65,6 +66,11 @@ void Receiver::receiveFile() {
             totalPackets = packet.packetIndex + 1;
         }
 
+        if (mtu == 0 && !packet.isLast) {
+            mtu = packet.dataSize;
+            std::cout << "[INFO] Inferred MTU: " << mtu << " bytes" << std::endl;
+        }
+
         std::cout << "[INFO] Message " << packet.packetIndex << " received with " 
                   << packet.dataSize << " bytes of actual data" << std::endl;
 
@@ -72,7 +78,7 @@ void Receiver::receiveFile() {
         if (receivedPackets.find(packet.packetIndex) != receivedPackets.end()) {
             std::cout << "[INFO] Duplicate packet " << packet.packetIndex << " ignored" << std::endl;
         } else {
-            std::streampos offset = static_cast<std::streampos>(packet.packetIndex) * MAX_DATA_SIZE;
+            std::streampos offset = static_cast<std::streampos>(packet.packetIndex) * static_cast<std::streampos>(mtu > 0 ? mtu : MAX_DATA_SIZE);
             outFile.seekp(offset);
             outFile.write(packet.data, packet.dataSize);
             outFile.flush();
