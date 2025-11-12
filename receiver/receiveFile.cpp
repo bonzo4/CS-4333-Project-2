@@ -46,12 +46,12 @@ void Receiver::receiveFile() {
     while (totalPackets == 0 || receivedPackets.size() < totalPackets) {
         // receive packets
         ssize_t bytesReceived = recvfrom(
-            socketFd,                        // socket file descriptor
-            &packet,                         // buffer to store received packet
-            sizeof(packet),                  // size of the buffer
-            0,                               // flags
-            (struct sockaddr*)&senderAddr,   // address of the sender
-            &senderAddrLen                   // length of the sender address
+            socketFd,
+            &packet,
+            sizeof(packet),
+            0,
+            (struct sockaddr*)&senderAddr,
+            &senderAddrLen
         );                 
 
         if (bytesReceived <= 0) {
@@ -81,12 +81,12 @@ void Receiver::receiveFile() {
         Packet ackPacket;
         ackPacket.packetIndex = packet.packetIndex;
         size_t bytesSent = sendto(
-            socketFd,                       // socket file descriptor 
-            &ackPacket,                     // buffer to send
-            sizeof(ackPacket),              // size of the ACK packet
-            0,                              // flags
-            (struct sockaddr*)&senderAddr,  // address of the sender
-            senderAddrLen                   // length of the sender address
+            socketFd,
+            &ackPacket,
+            sizeof(ackPacket),
+            0,
+            (struct sockaddr*)&senderAddr,
+            senderAddrLen
         );
 
         if (bytesSent <= 0) {

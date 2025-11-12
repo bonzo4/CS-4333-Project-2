@@ -56,9 +56,11 @@ void Sender::sendFile() {
                 dataPacket.isLast = true;
             }
     
-            PacketInfo packetInfo;
-            packetInfo.packet = dataPacket;
-            packetInfo.hasBeenSent = false;
+            PacketInfo packetInfo = {
+                .packet = dataPacket,
+                .hasBeenSent = false
+            };
+            
             packetsToSend[packetIndex] = packetInfo;
 
             currentOffset += dataPacket.dataSize;
@@ -75,14 +77,14 @@ void Sender::sendFile() {
         static std::mt19937 gen(rd());
         std::shuffle(packetKeys.begin(), packetKeys.end(), gen);
         
-        static std::uniform_real_distribution<> dis(0.0, 1.0);
-        
         for (int packetKey : packetKeys) {
             PacketInfo& packetInfo = packetsToSend[packetKey];
             
             if (packetInfo.hasBeenSent) {
                 continue;
             }
+
+            static std::uniform_real_distribution<> dis(0.0, 1.0);
             float randomValue = dis(gen);
 
             packetInfo.hasBeenSent = true;
@@ -91,12 +93,12 @@ void Sender::sendFile() {
                 std::cout << "[INFO] Simulating packet loss for message " << packetKey << std::endl;
             } else {
                 ssize_t bytesSent = sendto(
-                    socketfd,                       // socket file descriptor
-                    &packetInfo.packet,             // buffer to send
-                    sizeof(packetInfo.packet),      // size of the packet
-                    0,                              // flags
-                    (struct sockaddr*)&recvAddr,    // address of the receiver
-                    sizeof(recvAddr)                // length of the receiver address
+                    socketfd,
+                    &packetInfo.packet,
+                    sizeof(packetInfo.packet),
+                    0,
+                    (struct sockaddr*)&recvAddr,
+                    sizeof(recvAddr)
                 );
                 std::cout << "[INFO] Message " << packetKey 
                             << " sent with " << packetInfo.packet.dataSize 
@@ -104,7 +106,6 @@ void Sender::sendFile() {
             }
         }
 
-        // wait for ACKs with timeout
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(socketfd, &readfds);
@@ -136,13 +137,9 @@ void Sender::sendFile() {
                 &ackAddrLen                  // length of the sender address
             );
 
-            int ackIndex = ackPacket.packetIndex;
+            std::cout << "[INFO] Message " << ackPacket.packetIndex << " acknowledged" << std::endl;
 
-            if (packetsToSend.find(ackIndex) != packetsToSend.end()) {
-                std::cout << "[INFO] Message " << ackIndex << " acknowledged" << std::endl;
-
-                packetsToSend.erase(ackIndex);
-            } 
+            packetsToSend.erase(ackPacket.packetIndex);
         }
     }
     
