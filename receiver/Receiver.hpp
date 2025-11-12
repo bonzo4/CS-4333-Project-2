@@ -21,6 +21,7 @@ struct Packet {
     int packetIndex;
     int dataSize;
     bool isLast;
+    long offset;
     char data[MAX_DATA_SIZE];
 };
 

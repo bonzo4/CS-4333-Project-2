@@ -37,6 +37,7 @@ void Sender::sendFile() {
     long windowSize = static_cast<long>(getModeParameter() / getMTU());
     std::unordered_map<int, PacketInfo> packetsToSend;
     bool allDataRead = false;
+    long currentOffset = 0;
 
     while (!allDataRead || !packetsToSend.empty()) {
         // create packets and add packets to window
@@ -48,6 +49,7 @@ void Sender::sendFile() {
             dataPacket.dataSize = file.gcount();
             dataPacket.packetIndex = packetIndex;
             dataPacket.isLast = false;
+            dataPacket.offset = currentOffset;
 
             if (file.eof()) {
                 allDataRead = true;
@@ -59,6 +61,7 @@ void Sender::sendFile() {
             packetInfo.hasBeenSent = false;
             packetsToSend[packetIndex] = packetInfo;
 
+            currentOffset += dataPacket.dataSize;
             packetIndex++;
         }
 

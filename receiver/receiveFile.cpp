@@ -25,8 +25,7 @@ void Receiver::receiveFile() {
               << " listening on 127.0.0.1:" << getLocalPort() 
               << std::endl;
 
-    std::ofstream outFile(getFilename(), std::ios::binary | std::ios::in | std::ios::out | std::ios::trunc);
-
+    std::ofstream outFile(getFilename(), std::ios::binary);
     if (!outFile.is_open()) {
         std::cerr << "[ERROR] Could not open output file " << getFilename() << std::endl;
         close(socketFd);
@@ -43,7 +42,6 @@ void Receiver::receiveFile() {
     std::set<int> receivedPackets;
     long filesize = 0;
     int totalPackets = 0;
-    int mtu = 0;
 
     while (totalPackets == 0 || receivedPackets.size() < totalPackets) {
         // receive packets
@@ -64,10 +62,6 @@ void Receiver::receiveFile() {
             totalPackets = packet.packetIndex + 1;
         }
 
-        if (mtu == 0 && !packet.isLast) {
-            mtu = packet.dataSize;
-        }
-
         std::cout << "[INFO] Message " << packet.packetIndex << " received with " 
                   << packet.dataSize << " bytes of actual data" << std::endl;
 
@@ -75,8 +69,7 @@ void Receiver::receiveFile() {
         if (receivedPackets.find(packet.packetIndex) != receivedPackets.end()) {
             std::cout << "[INFO] Duplicate packet " << packet.packetIndex << " ignored" << std::endl;
         } else {
-            std::streampos offset = static_cast<std::streampos>(packet.packetIndex) * static_cast<std::streampos>(mtu > 0 ? mtu : MAX_DATA_SIZE);
-            outFile.seekp(offset);
+            outFile.seekp(packet.offset);
             outFile.write(packet.data, packet.dataSize);
             outFile.flush();
             
