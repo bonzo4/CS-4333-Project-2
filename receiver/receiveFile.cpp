@@ -40,10 +40,8 @@ void Receiver::receiveFile() {
 
     std::cout << "[INFO] Waiting to receive file..." << std::endl;
 
-    time_t startTime;
-    long filesize = 0;
-
     std::set<int> receivedPackets;
+    long filesize = 0;
     int totalPackets = 0;
     int mtu = 0;
 
@@ -68,7 +66,6 @@ void Receiver::receiveFile() {
 
         if (mtu == 0 && !packet.isLast) {
             mtu = packet.dataSize;
-            std::cout << "[INFO] Inferred MTU: " << mtu << " bytes" << std::endl;
         }
 
         std::cout << "[INFO] Message " << packet.packetIndex << " received with " 
